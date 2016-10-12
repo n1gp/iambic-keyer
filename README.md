@@ -4,7 +4,7 @@
         the openHPSDR Hermes iambic.v implementation to build
         and run on a raspberry PI 3 or many other SBC's.
 
-        Check out the GPIO assignments in iambi.c and suite them
+        Check out the GPIO assignments in iambic.c and suite them
         to your board.
 
         This code implements an Iambic CW keyer.  The following features are supported:
