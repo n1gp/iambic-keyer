@@ -75,15 +75,24 @@ Boston, MA  02110-1301, USA.
 #include <wiringPi.h>
 #include <softTone.h>
 #include <pigpio.h>
+#include "beep.h"
 
 static void* keyer_thread(void *arg);
 static pthread_t keyer_thread_id;
 
 // GPIO pins
-#define TONE_OUT_GPIO 11
+// set to 0 to use the PI's audio out for sidetone
+#define SIDETONE_GPIO 0 // this is in wiringPi notation
+
+#if 0
 #define KEYER_OUT_GPIO 12
 #define LEFT_PADDLE_GPIO 13
 #define RIGHT_PADDLE_GPIO 15
+#else
+#define KEYER_OUT_GPIO 12
+#define LEFT_PADDLE_GPIO 15
+#define RIGHT_PADDLE_GPIO 14
+#endif
 
 #define KEYER_STRAIGHT 0
 #define KEYER_MODE_A 1
@@ -121,6 +130,7 @@ static int cw_keyer_weight = 50;
 static int cw_keys_reversed = 0;
 static int cw_keyer_mode = 1;
 static int cw_keyer_sidetone_frequency = 800;
+static int cw_keyer_sidetone_volume = 83;
 static int cw_keyer_spacing = 0;
 static sem_t cw_event;
 
@@ -160,13 +170,20 @@ void clear_memory() {
 void set_keyer_out(int state) {
     if (keyer_out != state) {
         keyer_out = state;
+
         if (state) {
             gpioWrite(KEYER_OUT_GPIO, 1);
-            softToneWrite (TONE_OUT_GPIO, cw_keyer_sidetone_frequency);
+            if (SIDETONE_GPIO)
+                softToneWrite (SIDETONE_GPIO, cw_keyer_sidetone_frequency);
+            else
+                beep_freq = cw_keyer_sidetone_frequency;
         }
         else {
             gpioWrite(KEYER_OUT_GPIO, 0);
-            softToneWrite (TONE_OUT_GPIO, 0);
+            if (SIDETONE_GPIO)
+                softToneWrite (SIDETONE_GPIO, 0);
+            else
+                beep_freq = 0;
         }
     }
 }
@@ -362,6 +379,9 @@ int main (int argc, char **argv) {
             case 's':
                 cw_keyer_speed = atoi(argv[++i]);
                 break;
+            case 'v':
+                cw_keyer_sidetone_volume = atoi(argv[++i]);
+                break;
             case 'w':
                 cw_keyer_weight = atoi(argv[++i]);
                 break;
@@ -369,7 +389,8 @@ int main (int argc, char **argv) {
                 fprintf(stderr,
                         "iambic [-c strict_char_spacing (0=off, 1=on)]\n"
                         "       [-m mode (0=straight or bug, 1=iambic_a, 2=iambic_b)]\n"
-                        "       [-s speed_wpm] [-f sidetone_freq_hz] [-w weight]\n");
+                        "       [-s speed_wpm] [-f sidetone_freq_hz] [-v sidetone volume (0-100)]"
+                        "       [-w weight]\n");
                 exit(1);
             }
         else break;
@@ -405,7 +426,10 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    softToneCreate(TONE_OUT_GPIO);
+    if (SIDETONE_GPIO)
+        softToneCreate(SIDETONE_GPIO);
+    else
+        beep_init(cw_keyer_sidetone_volume);
 
     i = sem_init(&cw_event, 0, 0);
     running = 1;
@@ -419,6 +443,7 @@ int main (int argc, char **argv) {
     signal(SIGKILL, sig_handler);
     pthread_join(keyer_thread_id, 0);
     sem_destroy(&cw_event);
+    beep_close();
 
     return 0;
 }
