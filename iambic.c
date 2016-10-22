@@ -389,8 +389,8 @@ int main (int argc, char **argv) {
                 fprintf(stderr,
                         "iambic [-c strict_char_spacing (0=off, 1=on)]\n"
                         "       [-m mode (0=straight or bug, 1=iambic_a, 2=iambic_b)]\n"
-                        "       [-s speed_wpm] [-f sidetone_freq_hz] [-v sidetone volume (0-100)]"
-                        "       [-w weight]\n");
+                        "       [-s speed_wpm] [-f sidetone_freq_hz]\n"
+                        "       [-v sidetone volume (0-100)] [-w weight]\n");
                 exit(1);
             }
         else break;
