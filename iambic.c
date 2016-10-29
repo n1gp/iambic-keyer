@@ -466,6 +466,7 @@ int main (int argc, char **argv) {
     if (SIDETONE_GPIO)
         softToneCreate(SIDETONE_GPIO);
     else {
+        beep_mute(1);
         beep_init(cw_keyer_sidetone_volume, cw_keyer_sidetone_frequency);
         beep_mute(0);
     }
