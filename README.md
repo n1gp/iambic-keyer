@@ -39,5 +39,5 @@
         Speed calculation -  Using standard PARIS timing, dot_period(mS) = 1200/WPM
 
         NOTES:
-        In iambic.c set SIDETONE_GPIO to 0 to use the PI's audio out for sidetone
-        OR an actual wiringPi GPIO number for the softToneWrite() sidetone.
+        In iambic.c set SIDETONE_GPIO to 0 to use the PI's built-on audio out jack
+        for sidetone OR an actual wiringPi GPIO number for the softToneWrite() sidetone.
