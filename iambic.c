@@ -386,6 +386,7 @@ void sig_handler(int sig) {
 
 int main (int argc, char **argv) {
     int i;
+    char snd_dev[64]="hw:0";
     struct sched_param param;
 
     param.sched_priority = MY_PRIORITY;
@@ -407,6 +408,9 @@ int main (int argc, char **argv) {
             case 'c':
                 cw_keyer_spacing = atoi(argv[++i]);
                 break;
+            case 'd':
+                strcpy(snd_dev, argv[++i]);
+                break;
             case 'f':
                 cw_keyer_sidetone_frequency = atoi(argv[++i]);
                 break;
@@ -425,6 +429,7 @@ int main (int argc, char **argv) {
             default:
                 fprintf(stderr,
                         "iambic [-c strict_char_spacing (0=off, 1=on)]\n"
+                        "       [-d sound device string (default is hw:0)]\n"
                         "       [-m mode (0=straight or bug, 1=iambic_a, 2=iambic_b)]\n"
                         "       [-f sidetone_freq_hz] [-s speed_wpm]\n"
                         "       [-v sidetone volume (0-100)] [-w weight (33-66)]\n");
@@ -467,7 +472,7 @@ int main (int argc, char **argv) {
         softToneCreate(SIDETONE_GPIO);
     else {
         beep_mute(1);
-        beep_init(cw_keyer_sidetone_volume, cw_keyer_sidetone_frequency);
+        beep_init(cw_keyer_sidetone_volume, cw_keyer_sidetone_frequency, snd_dev);
         beep_mute(0);
     }
 

@@ -37,7 +37,7 @@ Boston, MA  02110-1301, USA.
 
 static double beep_freq = 800;                          /* sinusoidal wave frequency in Hz */
 
-static char *device = "hw:0";
+static char device[64];
 static snd_pcm_format_t format = SND_PCM_FORMAT_S16;    /* sample format */
 static unsigned int rate = 48000;                       /* stream rate */
 static unsigned int channels = 2;                       /* count of channels */
@@ -318,7 +318,8 @@ static void beep_vol(long volume)
     snd_mixer_selem_id_set_name(sid, selem_name);
     elem = snd_mixer_find_selem(mhandle, sid);
     snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
-    min = -2000; // PI's audio mixer range is broken
+    if (strcmp(device, "hw:0") == 0)
+        min = -2000; // PI's audio mixer range is broken
     output = (((max - min) * volume) / 100) + min;
     snd_mixer_selem_set_playback_volume_all(elem, output);
 
@@ -378,7 +379,8 @@ static void* beep_thread(void *arg) {
         return 0;
 }
 
-void beep_init(long volume, double freq) {
+void beep_init(long volume, double freq, char *snd_dev) {
+    strcpy(device, snd_dev);
     beep_freq = freq;
     int i = pthread_create(&beep_thread_id, NULL, beep_thread, NULL);
     if(i < 0) {
