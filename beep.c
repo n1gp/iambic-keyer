@@ -36,6 +36,7 @@ Boston, MA  02110-1301, USA.
 #include <alsa/asoundlib.h>
 
 static double beep_freq = 800;                          /* sinusoidal wave frequency in Hz */
+int beep_mute = 1;
 
 static char device[64];
 static snd_pcm_format_t format = SND_PCM_FORMAT_S16;    /* sample format */
@@ -93,8 +94,13 @@ static void generate_sine(const snd_pcm_channel_area_t *areas,
                 } fval;
                 int res, i;
 
-                res = sin(phase) * maxval;
-                res ^= 1U << (format_bits - 1);
+                if(beep_mute)
+                    res = 0;
+                else {
+                    res = sin(phase) * maxval;
+                    res ^= 1U << (format_bits - 1);
+                }
+
                 for (chn = 0; chn < channels; chn++) {
                         /* Generate data in native endian format */
                             for (i = 0; i < bps; i++)
@@ -272,39 +278,14 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
         return 0;
 }
 
-void beep_mute(int mute)
-{
-    static int first = 1;
-    int err;
-    static snd_ctl_elem_id_t *id;
-    static snd_hctl_elem_t *elem;
-    static snd_ctl_elem_value_t *control;
-
-    if (first) {
-    first = 0;
-    err = snd_hctl_open(&hctl, device, 0);
-    err = snd_hctl_load(hctl);
-    snd_ctl_elem_id_alloca(&id);
-    snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_MIXER);
-    snd_ctl_elem_id_set_name(id, "PCM Playback Switch");
-
-    elem = snd_hctl_find_elem(hctl, id);
-
-    snd_ctl_elem_value_alloca(&control);
-    snd_ctl_elem_value_set_id(control, id);   
-    }
-
-    snd_ctl_elem_value_set_integer(control, 0, mute);
-    err = snd_hctl_elem_write(elem, control);
-}
-
 static void beep_vol(long volume)
 {
     long min, max, output;
     snd_mixer_selem_id_t *sid;
     snd_mixer_t *mhandle;
-    const char *selem_name = "PCM";
-    int do_once = 1;
+    // look for mixer controls in this order
+    const char vControls[3][8] = {"Master","PCM","Speaker"};
+    int i;
     snd_mixer_elem_t* elem;
 
     if (volume > 100) volume = 100; // sounds raspy any higher
@@ -315,11 +296,18 @@ static void beep_vol(long volume)
     snd_mixer_load(mhandle);
     snd_mixer_selem_id_alloca(&sid);
     snd_mixer_selem_id_set_index(sid, 0);
-    snd_mixer_selem_id_set_name(sid, selem_name);
-    elem = snd_mixer_find_selem(mhandle, sid);
+    for (i = 0; i < 3; i++) {
+        snd_mixer_selem_id_set_name(sid, vControls[i]);
+        elem = snd_mixer_find_selem(mhandle, sid);
+        if (elem) {
+            printf("FOUND: %s\n", vControls[i]);
+            break;
+        }
+    }
+    if (elem == 0) return; // TODO, this is really an error
     snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
-    if (strcmp(device, "hw:0") == 0)
-        min = -2000; // PI's audio mixer range is broken
+    if ((strcmp(device, "hw:0") == 0) && (min <= -2000))
+        min = -2000; // assume this is the PI's audio mixer
     output = (((max - min) * volume) / 100) + min;
     snd_mixer_selem_set_playback_volume_all(elem, output);
 
@@ -391,7 +379,7 @@ void beep_init(long volume, double freq, char *snd_dev) {
 }
 
 void beep_close() {
+    beep_mute = 1;
     pthread_cancel(beep_thread_id);
-    beep_mute(1);
     snd_hctl_close(hctl);
 }

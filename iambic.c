@@ -194,14 +194,14 @@ void set_keyer_out(int state) {
             if (SIDETONE_GPIO)
                 softToneWrite (SIDETONE_GPIO, cw_keyer_sidetone_frequency);
             else
-                beep_mute(1);
+                beep_mute = 0;
         }
         else {
             gpioWrite(KEYER_OUT_GPIO, 0);
             if (SIDETONE_GPIO)
                 softToneWrite (SIDETONE_GPIO, 0);
             else
-                beep_mute(0);
+                beep_mute = 1;
         }
     }
 }
@@ -389,6 +389,7 @@ int main (int argc, char **argv) {
     char snd_dev[64]="hw:0";
     struct sched_param param;
 
+#if 0
     param.sched_priority = MY_PRIORITY;
     if(sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
             perror("sched_setscheduler failed");
@@ -401,6 +402,7 @@ int main (int argc, char **argv) {
     }
 
     stack_prefault();
+#endif
 
     for (i = 1; i < argc; i++)
         if (argv[i][0] == '-')
@@ -470,11 +472,8 @@ int main (int argc, char **argv) {
 
     if (SIDETONE_GPIO)
         softToneCreate(SIDETONE_GPIO);
-    else {
-//        beep_mute(1);
+    else
         beep_init(cw_keyer_sidetone_volume, cw_keyer_sidetone_frequency, snd_dev);
-        beep_mute(0);
-    }
 
     i = sem_init(&cw_event, 0, 0);
     running = 1;
