@@ -299,10 +299,7 @@ static void beep_vol(long volume)
     for (i = 0; i < 3; i++) {
         snd_mixer_selem_id_set_name(sid, vControls[i]);
         elem = snd_mixer_find_selem(mhandle, sid);
-        if (elem) {
-            printf("FOUND: %s\n", vControls[i]);
-            break;
-        }
+        if (elem) break;
     }
     if (elem == 0) return; // TODO, this is really an error
     snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
