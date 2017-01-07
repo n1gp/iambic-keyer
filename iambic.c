@@ -153,7 +153,7 @@ void keyer_update() {
 }
 
 void keyer_event(int gpio, int level, uint32_t tick) {
-    int state = (level != 0);
+    int state = (level == 0);
 
     if (gpio == LEFT_PADDLE_GPIO)
         kcwl = state;
