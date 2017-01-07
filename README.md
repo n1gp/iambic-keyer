@@ -40,4 +40,10 @@
 
         NOTES:
         In iambic.c set SIDETONE_GPIO to 0 to use the PI's built-on audio out jack
-        for sidetone OR an actual wiringPi GPIO number for the softToneWrite() sidetone.
+        for sidetone OR an actual wiringPi GPIO number for the softToneWrite() sidetone.  
+
+        This version of iambic-keyer uses Jack Audio Connection.  
+        This is a good intro for getting Jack setup on the PI:  
+           http://wiki.linuxaudio.org/wiki/raspberrypi#audio_software_repository
+
+        You need to run this using sudo to use the pigpio functions.  

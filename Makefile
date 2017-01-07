@@ -1,5 +1,6 @@
+OSC_CFLAGS=-DOSCILLATOR_Z -DOSCILLATOR_D
 iambic: iambic.c .FORCE
-	gcc -o iambic iambic.c beep.c -lwiringPi -lpigpio -lpthread -lasound -lm -lrt
+	gcc $(OSC_CFLAGS) -o iambic iambic.c keyed_tone.c -lwiringPi -lpigpio -lpthread -lm -ljack -lrt
 
 .FORCE:
 

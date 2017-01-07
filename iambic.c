@@ -77,7 +77,7 @@ Boston, MA  02110-1301, USA.
 #include <wiringPi.h>
 #include <softTone.h>
 #include <pigpio.h>
-#include "beep.h"
+#include "keyed_tone.h"
 
 static void* keyer_thread(void *arg);
 static pthread_t keyer_thread_id;
@@ -100,12 +100,7 @@ static pthread_t keyer_thread_id;
 #define KEYER_MODE_A 1
 #define KEYER_MODE_B 2
 
-// de-glitch inputs
-#define GPIO_STEADY_TIME_US 25000
-
-#define MY_PRIORITY (90)
-#define MAX_SAFE_STACK (8*1024)
-#define NSEC_PER_SEC   (1000000000)
+#define NSEC_PER_SEC (1000000000)
 
 enum {
     CHECK = 0,
@@ -136,23 +131,12 @@ static int cw_keyer_weight = 55;
 static int cw_keys_reversed = 0;
 static int cw_keyer_mode = KEYER_MODE_B;
 static int cw_keyer_sidetone_frequency = 700;
-static int cw_keyer_sidetone_volume = 83;
+static int cw_keyer_sidetone_gain = 10;
+static int cw_keyer_sidetone_envelope = 5;
 static int cw_keyer_spacing = 0;
 static sem_t cw_event;
 
 static int running, keyer_out = 0;
-
-// using clock_nanosleep of librt
-extern int clock_nanosleep(clockid_t __clock_id, int __flags,
-      __const struct timespec *__req,
-      struct timespec *__rem);
-
-void stack_prefault(void) {
-        unsigned char dummy[MAX_SAFE_STACK];
-
-        memset(dummy, 0, MAX_SAFE_STACK);
-        return;
-}
 
 void keyer_update() {
     dot_delay = 1200 / cw_keyer_speed;
@@ -169,7 +153,7 @@ void keyer_update() {
 }
 
 void keyer_event(int gpio, int level, uint32_t tick) {
-    int state = (level == 0);
+    int state = (level != 0);
 
     if (gpio == LEFT_PADDLE_GPIO)
         kcwl = state;
@@ -194,14 +178,14 @@ void set_keyer_out(int state) {
             if (SIDETONE_GPIO)
                 softToneWrite (SIDETONE_GPIO, cw_keyer_sidetone_frequency);
             else
-                beep_mute = 0;
+                keyed_tone_mute = 2;
         }
         else {
             gpioWrite(KEYER_OUT_GPIO, 0);
             if (SIDETONE_GPIO)
                 softToneWrite (SIDETONE_GPIO, 0);
             else
-                beep_mute = 1;
+                keyed_tone_mute = 1;
         }
     }
 }
@@ -381,28 +365,13 @@ static void* keyer_thread(void *arg) {
 
 void sig_handler(int sig) {
     running = 0;
-    exit(0);
+    sem_post(&cw_event);
 }
 
 int main (int argc, char **argv) {
     int i;
     char snd_dev[64]="hw:0";
     struct sched_param param;
-
-#if 0
-    param.sched_priority = MY_PRIORITY;
-    if(sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
-            perror("sched_setscheduler failed");
-            running = 0;
-    }
-
-    if(mlockall(MCL_CURRENT|MCL_FUTURE) == -1) {
-            perror("mlockall failed");
-            running = 0;
-    }
-
-    stack_prefault();
-#endif
 
     for (i = 1; i < argc; i++)
         if (argv[i][0] == '-')
@@ -413,17 +382,21 @@ int main (int argc, char **argv) {
             case 'd':
                 strcpy(snd_dev, argv[++i]);
                 break;
+            case 'e': /* envelope in milliseconds */
+                cw_keyer_sidetone_envelope = atoi(argv[++i]);
+                printf("E: %d\n", cw_keyer_sidetone_envelope);
+                break;
             case 'f':
                 cw_keyer_sidetone_frequency = atoi(argv[++i]);
+                break;
+            case 'g':/* gain in dB */
+                cw_keyer_sidetone_gain = atoi(argv[++i]);
                 break;
             case 'm':
                 cw_keyer_mode = atoi(argv[++i]);
                 break;
             case 's':
                 cw_keyer_speed = atoi(argv[++i]);
-                break;
-            case 'v':
-                cw_keyer_sidetone_volume = atoi(argv[++i]);
                 break;
             case 'w':
                 cw_keyer_weight = atoi(argv[++i]);
@@ -432,9 +405,10 @@ int main (int argc, char **argv) {
                 fprintf(stderr,
                         "iambic [-c strict_char_spacing (0=off, 1=on)]\n"
                         "       [-d sound device string (default is hw:0)]\n"
+                        "       [-e sidetone start/end ramp envelope in ms (default is 5)]\n"
+                        "       [-f sidetone_freq_hz] [-g sidetone gain in dB]\n"
                         "       [-m mode (0=straight or bug, 1=iambic_a, 2=iambic_b)]\n"
-                        "       [-f sidetone_freq_hz] [-s speed_wpm]\n"
-                        "       [-v sidetone volume (0-100)] [-w weight (33-66)]\n");
+                        "       [-s speed_wpm] [-w weight (33-66)]\n");
                 exit(1);
             }
         else break;
@@ -454,12 +428,10 @@ int main (int argc, char **argv) {
     gpioSetPullUpDown(RIGHT_PADDLE_GPIO,PI_PUD_UP);
     usleep(100000);
     gpioSetAlertFunc(RIGHT_PADDLE_GPIO, keyer_event);
-    gpioGlitchFilter(RIGHT_PADDLE_GPIO, GPIO_STEADY_TIME_US);
     gpioSetMode(LEFT_PADDLE_GPIO, PI_INPUT);
     gpioSetPullUpDown(LEFT_PADDLE_GPIO,PI_PUD_UP);
     usleep(100000);
     gpioSetAlertFunc(LEFT_PADDLE_GPIO, keyer_event);
-    gpioGlitchFilter(LEFT_PADDLE_GPIO, GPIO_STEADY_TIME_US);
     gpioSetMode(KEYER_OUT_GPIO, PI_OUTPUT);
     gpioWrite(KEYER_OUT_GPIO, 0);
 
@@ -472,8 +444,13 @@ int main (int argc, char **argv) {
 
     if (SIDETONE_GPIO)
         softToneCreate(SIDETONE_GPIO);
-    else
-        beep_init(cw_keyer_sidetone_volume, cw_keyer_sidetone_frequency, snd_dev);
+    else {
+        i = keyed_tone_start(cw_keyer_sidetone_gain, cw_keyer_sidetone_frequency, cw_keyer_sidetone_envelope);
+        if(i < 0) {
+            fprintf(stderr,"keyed_tone_start failed %d\n", i);
+            exit(-1);
+        }
+    }
 
     i = sem_init(&cw_event, 0, 0);
     running = 1;
@@ -486,8 +463,8 @@ int main (int argc, char **argv) {
     signal(SIGINT, sig_handler);
     signal(SIGKILL, sig_handler);
     pthread_join(keyer_thread_id, 0);
+    keyed_tone_close();
     sem_destroy(&cw_event);
-    beep_close();
 
     return 0;
 }
