@@ -3,9 +3,11 @@
 
 /*
 
-    10/12/2016, Rick Koch / N1GP adapted Phil's verilog code from
+    10/12/2016, Rick Koch / N1GP, I adapted Phil's verilog code from
                 the openHPSDR Hermes iambic.v implementation to build
                 and run on a raspberry PI 3.
+
+    1/7/2017,   N1GP, adapted to work with Jack Audio, much better timing.
 
 --------------------------------------------------------------------------------
 This library is free software; you can redistribute it and/or
