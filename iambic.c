@@ -136,6 +136,7 @@ static int cw_keyer_sidetone_frequency = 700;
 static int cw_keyer_sidetone_gain = 10;
 static int cw_keyer_sidetone_envelope = 5;
 static int cw_keyer_spacing = 0;
+static int cw_active_state = 0;
 static sem_t cw_event;
 
 static int running, keyer_out = 0;
@@ -155,7 +156,7 @@ void keyer_update() {
 }
 
 void keyer_event(int gpio, int level, uint32_t tick) {
-    int state = (level == 0);
+    int state = (cw_active_state == 0) ? (level == 0) : (level != 0);
 
     if (gpio == LEFT_PADDLE_GPIO)
         kcwl = state;
@@ -378,6 +379,9 @@ int main (int argc, char **argv) {
     for (i = 1; i < argc; i++)
         if (argv[i][0] == '-')
             switch (argv[i][1]) {
+            case 'a':
+                cw_active_state = atoi(argv[++i]);
+                break;
             case 'c':
                 cw_keyer_spacing = atoi(argv[++i]);
                 break;
@@ -405,7 +409,8 @@ int main (int argc, char **argv) {
                 break;
             default:
                 fprintf(stderr,
-                        "iambic [-c strict_char_spacing (0=off, 1=on)]\n"
+                        "iambic [-a GPIO active_state (0=LOW, 1=HIGH) default is 0]\n"
+                        "       [-c strict_char_spacing (0=off, 1=on)]\n"
                         "       [-d sound device string (default is hw:0)]\n"
                         "       [-e sidetone start/end ramp envelope in ms (default is 5)]\n"
                         "       [-f sidetone_freq_hz] [-g sidetone gain in dB]\n"
